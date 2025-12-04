@@ -1,23 +1,26 @@
-# main.py
-from datetime import datetime, timedelta
-import time
-import random
 import sys
 import os
+import time
+import random
+from datetime import datetime, timedelta
+from version import __version__
 
-# 添加当前目录到路径（确保 core 可导入）
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from core.config import load_config, validate_config
 from core.logger import setup_logger
 from core.ocr_engine import OCREngine
 from core.platform_adapter import ConfigurablePlatformAdapter
-from core.utils import find_window_by_titles
+from core.cleanup import cleanup_old_files, should_cleanup
 
-# ========================
-# 全局状态
-# ========================
 last_reply_time = None
+last_cleanup_time = 0
+
+# --- 新增：版本检查 ---
+if "--version" in sys.argv or "-v" in sys.argv:
+    print(f"IM Auto Reply Bot v{__version__}")
+    sys.exit(0)
+# ------------------------
 
 def should_reply(latest_text: str, is_from_others: bool, trigger_keywords, cooldown_sec) -> bool:
     global last_reply_time
@@ -37,18 +40,31 @@ def main():
     platforms_config = config["platforms"]
     current_platform_name = config["current_platform"]
 
-    logger = setup_logger()
-    logger.info(f"加载配置完成，当前平台: {current_platform_name}")
+    logger = setup_logger(log_dir=global_config["log_dir"])
+    logger.info("配置加载成功")
 
-    # 初始化 OCR
     ocr_engine = OCREngine(
         languages=global_config["ocr_languages"],
         use_gpu=global_config["use_gpu"]
     )
 
-    # 创建适配器
     platform_config = platforms_config[current_platform_name]
     adapter = ConfigurablePlatformAdapter(current_platform_name, platform_config, ocr_engine)
+
+    # 清理配置
+    cleanup_cfg = global_config.get("cleanup", {})
+    enable_cleanup = cleanup_cfg.get("enabled", False)
+    retain_days = cleanup_cfg.get("retain_days", 3)
+    cleanup_interval = cleanup_cfg.get("interval_sec", 3600)
+    screenshot_dir = global_config["screenshot_dir"]
+    log_dir = global_config["log_dir"]
+
+    # 首次清理
+    if enable_cleanup:
+        cleanup_old_files(screenshot_dir, retain_days, logger)
+        cleanup_old_files(log_dir, retain_days, logger)
+        global last_cleanup_time
+        last_cleanup_time = time.time()
 
     check_interval = global_config["check_interval_sec"]
     reply_cooldown = global_config["reply_cooldown_sec"]
@@ -59,9 +75,15 @@ def main():
 
     while True:
         try:
+            # >>> 定期清理 <<<
+            if enable_cleanup and should_cleanup(last_cleanup_time, cleanup_interval):
+                cleanup_old_files(screenshot_dir, retain_days, logger)
+                cleanup_old_files(log_dir, retain_days, logger)
+                last_cleanup_time = time.time()
+
             win = adapter.find_main_window()
             if not win:
-                logger.warning(f"未找到 {adapter.name} 窗口")
+                logger.warning(f"未找到窗口: {adapter.config['window_titles']}")
                 time.sleep(10)
                 continue
 

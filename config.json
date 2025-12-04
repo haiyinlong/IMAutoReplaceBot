@@ -3,10 +3,16 @@
     "reply_cooldown_sec": 60,
     "reply_message": "在的～请问有什么可以帮您？",
     "trigger_keywords": ["在吗", "在？", "你好"],
+    "log_dir": "logs",
     "screenshot_dir": "screenshots",
     "ocr_languages": ["ch_sim", "en"],
     "use_gpu": false,
-    "check_interval_sec": 15
+    "check_interval_sec": 15,
+    "cleanup": {
+      "enabled": true,
+      "retain_days": 3,
+      "interval_sec": 3600
+    }
   },
   "platforms": {
     "dingtalk": {

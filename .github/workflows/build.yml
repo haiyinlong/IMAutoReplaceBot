@@ -1,0 +1,180 @@
+name: Build & Package IM Auto Reply Bot
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Syntax check
+        run: python -m py_compile main.py core/*.py
+
+  build-windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed ^
+            --add-data "config.json;." ^
+            --add-data "screenshots;screenshots" ^
+            --add-data "logs;logs" ^
+            --name="IMAutoReplyBot" ^
+            main.py
+
+      - name: Create distribution package
+        run: |
+          mkdir dist_pkg
+          copy dist\IMAutoReplyBot.exe dist_pkg\
+          copy config.json dist_pkg\
+          Compress-Archive -Path dist_pkg\* -DestinationPath IMAutoReplyBot_Windows.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: IMAutoReplyBot_Windows
+          path: IMAutoReplyBot_Windows.zip
+
+  build-linux:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install system dependencies (for OpenCV)
+        run: sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile \
+            --add-data="config.json:." \
+            --add-data="screenshots:screenshots" \
+            --add-data="logs:logs" \
+            --name="IMAutoReplyBot" \
+            main.py
+
+      - name: Create distribution package
+        run: |
+          mkdir dist_pkg
+          cp dist/IMAutoReplyBot dist_pkg/
+          cp config.json dist_pkg/
+          tar -czf IMAutoReplyBot_Linux.tar.gz -C dist_pkg .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: IMAutoReplyBot_Linux
+          path: IMAutoReplyBot_Linux.tar.gz
+
+  build-macos:
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile \
+            --add-data="config.json:." \
+            --add-data="screenshots:screenshots" \
+            --add-data="logs:logs" \
+            --name="IMAutoReplyBot" \
+            main.py
+
+      - name: Create distribution package
+        run: |
+          mkdir dist_pkg
+          cp dist/IMAutoReplyBot dist_pkg/
+          cp config.json dist_pkg/
+          tar -czf IMAutoReplyBot_macOS.tar.gz -C dist_pkg .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: IMAutoReplyBot_macOS
+          path: IMAutoReplyBot_macOS.tar.gz
+
+  get-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract version from version.py
+        id: get_version
+        run: |
+          VERSION=$(grep -oP '__version__ = "\K[^"]+' version.py)
+          echo "Detected version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [get-version, build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ needs.get-version.outputs.version }}
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.RELEASE_VERSION }}
+          name: Auto Reply Bot v${{ env.RELEASE_VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/AutoReplyBot_Windows/AutoReplyBot_Windows.zip
+            artifacts/AutoReplyBot_Linux/AutoReplyBot_Linux.tar.gz
+            artifacts/AutoReplyBot_macOS/AutoReplyBot_macOS.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
