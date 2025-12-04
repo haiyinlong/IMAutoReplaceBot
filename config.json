@@ -1,0 +1,35 @@
+{
+  "global": {
+    "reply_cooldown_sec": 60,
+    "reply_message": "在的～请问有什么可以帮您？",
+    "trigger_keywords": ["在吗", "在？", "你好"],
+    "screenshot_dir": "screenshots",
+    "ocr_languages": ["ch_sim", "en"],
+    "use_gpu": false,
+    "check_interval_sec": 15
+  },
+  "platforms": {
+    "dingtalk": {
+      "window_titles": ["钉钉", "DingTalk"],
+      "chat_region": [520, 130, 1371, 650],
+      "contact_list_region": [162, 70, 150, 880],
+      "detect_unread": true,
+      "message_position_threshold": 0.45
+    },
+    "wechat": {
+      "window_titles": ["微信"],
+      "chat_region": [300, 150, 1000, 700],
+      "contact_list_region": [0, 200, 250, 800],
+      "detect_unread": false,
+      "message_position_threshold": 0.4
+    },
+    "telegram": {
+      "window_titles": ["Telegram", "Telegram Desktop"],
+      "chat_region": [350, 120, 1200, 800],
+      "contact_list_region": null,
+      "detect_unread": false,
+      "message_position_threshold": 0.45
+    }
+  },
+  "current_platform": "dingtalk"
+}
