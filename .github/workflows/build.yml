@@ -29,6 +29,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free up disk space (Windows)
+        shell: powershell
+        run: |
+          # 清理临时文件
+          Remove-Item -Path "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue
+          # 显示剩余空间
+          Get-PSDrive C
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -39,7 +47,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build with PyInstaller
+      - name: Build with PyInstaller (single file for Windows)
         shell: cmd
         run: |
           pyinstaller --onefile --windowed ^
@@ -67,6 +75,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free up disk space (Linux)
+        run: |
+          sudo apt-get clean
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo docker system prune -af || true
+          df -h
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -80,19 +95,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build with PyInstaller
+      - name: Build with PyInstaller (DIRECTORY MODE - no --onefile)
         run: |
-          pyinstaller --onefile \
+          pyinstaller \
             --add-data="config.json:." \
             --name="IMAutoReplyBot" \
             main.py
 
       - name: Create distribution package
         run: |
-          mkdir dist_pkg
-          cp dist/IMAutoReplyBot dist_pkg/
-          cp config.json dist_pkg/
-          tar -czf IMAutoReplyBot_Linux.tar.gz -C dist_pkg .
+          # 将 config.json 放入应用目录
+          cp config.json dist/IMAutoReplyBot/
+          # 打包整个目录
+          tar -czf IMAutoReplyBot_Linux.tar.gz -C dist/IMAutoReplyBot .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -106,6 +121,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free up disk space (macOS)
+        run: |
+          # macOS runner 空间相对宽松，但仍建议清理
+          df -h
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -116,19 +136,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build with PyInstaller
+      - name: Build with PyInstaller (DIRECTORY MODE - no --onefile)
         run: |
-          pyinstaller --onefile \
+          pyinstaller \
             --add-data="config.json:." \
             --name="IMAutoReplyBot" \
             main.py
 
       - name: Create distribution package
         run: |
-          mkdir dist_pkg
-          cp dist/IMAutoReplyBot dist_pkg/
-          cp config.json dist_pkg/
-          tar -czf IMAutoReplyBot_macOS.tar.gz -C dist_pkg .
+          cp config.json dist/IMAutoReplyBot/
+          tar -czf IMAutoReplyBot_macOS.tar.gz -C dist/IMAutoReplyBot .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
