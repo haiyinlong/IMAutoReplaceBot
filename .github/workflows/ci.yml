@@ -1,4 +1,4 @@
-name: Build & Package IM Auto Reply Bot
+name: CI - Test & Build
 
 on:
   push:
@@ -166,32 +166,3 @@ jobs:
           VERSION=$(grep -oP '__version__ = "\K[^"]+' version.py)
           echo "Detected version: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-  release:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [get-version, build-windows, build-linux, build-macos]
-    runs-on: ubuntu-latest
-    env:
-      RELEASE_VERSION: ${{ needs.get-version.outputs.version }}
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Display structure (debug)
-        run: ls -R artifacts
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ env.RELEASE_VERSION }}
-          name: IM Auto Reply Bot v${{ env.RELEASE_VERSION }}
-          draft: false
-          prerelease: false
-          files: |
-            artifacts/IMAutoReplyBot_Windows/IMAutoReplyBot_Windows.zip
-            artifacts/IMAutoReplyBot_Linux/IMAutoReplyBot_Linux.tar.gz
-            artifacts/IMAutoReplyBot_macOS/IMAutoReplyBot_macOS.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

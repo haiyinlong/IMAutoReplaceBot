@@ -1,0 +1,46 @@
+# .github/workflows/cd.yml
+name: CD - Release Package
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # 允许手动补发
+
+jobs:
+  get-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract version
+        id: get_version
+        run: |
+          VERSION=$(grep -oP '__version__ = "\K[^"]+' version.py)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+  download-and-release:
+    needs: get-version
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ needs.get-version.outputs.version }}
+    steps:
+      - name: Download latest workflow artifacts
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: ci.yml 
+          name: ''
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.RELEASE_VERSION }}
+          name: IM Auto Reply Bot v${{ env.RELEASE_VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/IMAutoReplyBot_Windows/IMAutoReplyBot_Windows.zip
+            artifacts/IMAutoReplyBot_Linux/IMAutoReplyBot_Linux.tar.gz
+            artifacts/IMAutoReplyBot_macOS/IMAutoReplyBot_macOS.tar.gz
+          token: ${{ secrets.RELEASE_TOKEN }}
