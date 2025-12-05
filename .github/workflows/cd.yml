@@ -2,35 +2,31 @@
 name: CD - Release Package
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:  # 允许手动补发
+  workflow_run:
+    workflows: ["CI - Test & Build"]   # ← 必须和 ci.yml 的 name 完全一致
+    types:
+      - completed
+    branches: [main]
 
 jobs:
-  get-version:
+  release-if-success:
+    # 只有当 CI 成功时才继续
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Extract version
-        id: get_version
-        run: |
-          VERSION=$(grep -oP '__version__ = "\K[^"]+' version.py)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-  download-and-release:
-    needs: get-version
-    runs-on: ubuntu-latest
-    env:
-      RELEASE_VERSION: ${{ needs.get-version.outputs.version }}
-    steps:
-      - name: Download latest workflow artifacts
+      - name: Download artifacts from CI workflow
         uses: dawidd6/action-download-artifact@v6
         with:
-          workflow: ci.yml 
-          name: ''
+          workflow: ci.yml
+          run_id: ${{ github.event.workflow_run.id }}  # ← 关键：指定具体运行实例
           path: artifacts
+
+      - name: Extract version from version.py (or get from artifact)
+        run: |
+          # 从源码提取版本（需要 checkout）
+          git clone https://github.com/${{ github.repository }}.git --branch main --depth 1 .
+          VERSION=$(grep -oP '__version__ = "\K[^"]+' version.py)
+          echo "RELEASE_VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
