@@ -32,9 +32,7 @@ jobs:
       - name: Free up disk space (Windows)
         shell: powershell
         run: |
-          # 清理临时文件
           Remove-Item -Path "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue
-          # 显示剩余空间
           Get-PSDrive C
 
       - name: Set up Python
@@ -95,18 +93,40 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build with PyInstaller (DIRECTORY MODE - no --onefile)
+      # 🔥 关键：清理可能被误打包的 OCR 模型缓存
+      - name: Clean up large caches (EasyOCR, Paddle, etc.)
+        run: |
+          rm -rf ~/.EasyOCR || true
+          rm -rf ~/.paddleocr || true
+          rm -rf ~/.cache/paddle || true
+          pip cache purge
+
+      - name: Build with PyInstaller (DIRECTORY MODE)
         run: |
           pyinstaller \
+            --clean \
+            --noconfirm \
             --add-data="config.json:." \
+            --exclude-module matplotlib \
+            --exclude-module scipy \
+            --exclude-module sklearn \
+            --exclude-module pandas \
+            --exclude-module jupyter \
+            --exclude-module IPython \
             --name="IMAutoReplyBot" \
             main.py
 
+      # 🔍 诊断：检查构建产物大小（上线稳定后可删除）
+      - name: Diagnose package size (critical!)
+        run: |
+          echo "=== Size of dist/IMAutoReplyBot ==="
+          du -sh dist/IMAutoReplyBot
+          echo "=== Top 20 largest files ==="
+          find dist/IMAutoReplyBot -type f -exec du -h {} + 2>/dev/null | sort -hr | head -n 20
+
       - name: Create distribution package
         run: |
-          # 将 config.json 放入应用目录
           cp config.json dist/IMAutoReplyBot/
-          # 打包整个目录
           tar -czf IMAutoReplyBot_Linux.tar.gz -C dist/IMAutoReplyBot .
 
       - name: Upload artifact
@@ -123,7 +143,6 @@ jobs:
 
       - name: Free up disk space (macOS)
         run: |
-          # macOS runner 空间相对宽松，但仍建议清理
           df -h
 
       - name: Set up Python
@@ -136,12 +155,35 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build with PyInstaller (DIRECTORY MODE - no --onefile)
+      # 🔥 同样清理 macOS 上的缓存（安全起见）
+      - name: Clean up caches on macOS
+        run: |
+          rm -rf ~/.EasyOCR || true
+          rm -rf ~/.paddleocr || true
+          rm -rf ~/Library/Caches/paddle || true
+          pip cache purge
+
+      - name: Build with PyInstaller (DIRECTORY MODE)
         run: |
           pyinstaller \
+            --clean \
+            --noconfirm \
             --add-data="config.json:." \
+            --exclude-module matplotlib \
+            --exclude-module scipy \
+            --exclude-module sklearn \
+            --exclude-module pandas \
+            --exclude-module jupyter \
+            --exclude-module IPython \
             --name="IMAutoReplyBot" \
             main.py
+
+      # 🔍 诊断（可选）
+      - name: Diagnose package size (macOS)
+        run: |
+          echo "=== Size of dist/IMAutoReplyBot ==="
+          du -sh dist/IMAutoReplyBot
+          find dist/IMAutoReplyBot -type f -exec du -h {} + 2>/dev/null | sort -hr | head -n 10
 
       - name: Create distribution package
         run: |

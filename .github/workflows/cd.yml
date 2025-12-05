@@ -20,6 +20,10 @@ jobs:
           workflow: ci.yml
           run_id: ${{ github.event.workflow_run.id }}  # ← 关键：指定具体运行实例
           path: artifacts
+          extract: false
+
+      - name: List downloaded files (debug)
+        run: find artifacts -type f | sort
 
       - name: Extract version from version.py (or get from artifact)
         run: |
